@@ -2,6 +2,32 @@
    SAIBUDEEN & ANISHA — LUXURY ISLAMIC WEDDING INVITATION
    Vanilla JavaScript — modular, commented, dependency-free
    ============================================================ */
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
+
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  query,
+  orderBy,
+  onSnapshot,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDMX2ynKvX23HD_0q0-KSHrW4kRZo7FhXo",
+  authDomain: "saibudeen-anisha-wedding.firebaseapp.com",
+  projectId: "saibudeen-anisha-wedding",
+  storageBucket: "saibudeen-anisha-wedding.firebasestorage.app",
+  messagingSenderId: "194374533206",
+  appId: "1:194374533206:web:3cc8fee3d0f03be5237bf7",
+  measurementId: "G-5C8RP9SJ6B"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
 (function () {
   'use strict';
 
@@ -294,40 +320,105 @@
   function initWishes() {
     const form = document.getElementById('wishForm');
     const wall = document.getElementById('wishesWall');
-    if (!form) return;
 
+    if (!form || !wall) return;
+
+    const wishesRef = collection(db, 'weddingWishes');
+
+    // Existing default wishes
     const seed = [
-      { name: 'Family & Friends', text: 'May Allah bless this union with love, patience, and endless barakah.' },
-      { name: 'Well-wishers', text: 'Wishing you a lifetime of happiness, faith, and togetherness.' }
+      {
+        name: 'Family & Friends',
+        text: 'May Allah bless this union with love, patience, and endless barakah.'
+      },
+      {
+        name: 'Well-wishers',
+        text: 'Wishing you a lifetime of happiness, faith, and togetherness.'
+      }
     ];
-    seed.forEach(addWishCard);
 
-    form.addEventListener('submit', e => {
+    // Display default wishes
+    seed.forEach(wish => addWishCard(wish));
+
+    // Listen for wishes stored in Firestore
+    const wishesQuery = query(
+        wishesRef,
+        orderBy('createdAt', 'desc')
+    );
+
+    onSnapshot(
+        wishesQuery,
+        snapshot => {
+          // Remove previously loaded Firebase wishes
+          wall.querySelectorAll('.firebase-wish').forEach(card => {
+            card.remove();
+          });
+
+          // Display Firebase wishes
+          snapshot.forEach(doc => {
+            const wish = doc.data();
+            addWishCard(wish, true, true);
+          });
+        },
+        error => {
+          console.error('Failed to load wishes from Firebase:', error);
+        }
+    );
+
+    // Submit a new wish
+    form.addEventListener('submit', async e => {
       e.preventDefault();
+
       const nameInput = document.getElementById('wishName');
       const textInput = document.getElementById('wishText');
+
       const name = nameInput.value.trim();
       const text = textInput.value.trim();
+
       if (!name || !text) return;
-      addWishCard({ name, text }, true);
-      nameInput.value = '';
-      textInput.value = '';
+
+      try {
+        await addDoc(wishesRef, {
+          name: name,
+          text: text,
+          createdAt: serverTimestamp()
+        });
+
+        nameInput.value = '';
+        textInput.value = '';
+
+      } catch (error) {
+        console.error('Failed to save wish:', error);
+        alert('Sorry, your wish could not be submitted. Please try again.');
+      }
     });
 
-    function addWishCard(wish, prepend) {
+    function addWishCard(wish, prepend = false, isFirebaseWish = false) {
       const card = document.createElement('div');
+
       card.className = 'wish-card';
+
+      if (isFirebaseWish) {
+        card.classList.add('firebase-wish');
+      }
+
       const p = document.createElement('p');
       p.textContent = wish.text;
+
       const span = document.createElement('span');
       span.textContent = '— ' + wish.name;
+
       card.appendChild(p);
       card.appendChild(span);
-      if (prepend && wall.firstChild) wall.insertBefore(card, wall.firstChild);
-      else wall.appendChild(card);
+
+      if (prepend && wall.firstChild) {
+        wall.insertBefore(card, wall.firstChild);
+      } else {
+        wall.appendChild(card);
+      }
     }
   }
-
+  
   /* ----------------------------------------------------------
      12. MUSIC PLAYER
   ---------------------------------------------------------- */
